@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Gym Tracker"/>
+<meta name="theme-color" content="#111111"/>
+<title>Gym Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body,#root{height:100%;background:#111;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;}
+  input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+  input[type=number]{-moz-appearance:textfield;}
+  ::-webkit-scrollbar{display:none;}
+  body{overflow-y:auto;-webkit-overflow-scrolling:touch;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect}=React;
+
+// ── STORAGE (localStorage for GitHub Pages) ───────────────────────────────────
+const storage={
+  get:async(key)=>{try{const v=localStorage.getItem(key);return v?{value:v}:null;}catch{return null;}},
+  set:async(key,value)=>{try{localStorage.setItem(key,value);return{key,value};}catch{return null;}},
+};
+window.storage=storage;
+
+// ── PLAN DATA ─────────────────────────────────────────────────────────────────
+const PLAN={
+  Monday:{label:"Push",color:"#E8FF47",exercises:[
+    {id:"ibp",name:"Incline Barbell Bench Press",sets:4,reps:"6–8",protocol:"STR",progression:"Linear",cue:"30° incline · narrower grip"},
+    {id:"fdp",name:"Paused Flat DB Press",sets:3,reps:"8–12",protocol:"HYP",progression:"Double",cue:"1–2s pause at bottom"},
+    {id:"dcf",name:"Decline Cable Fly",sets:3,reps:"10–15",protocol:"HYP",progression:"Double",cue:"High-to-low · supinate wrists at end"},
+    {id:"sdp",name:"Standing DB Shoulder Press",sets:3,reps:"10–12",protocol:"HYP",progression:"Double",cue:"Standing beats seated for delt activation"},
+    {id:"llr",name:"Lean-Away Lateral Raise",sets:3,reps:"12–15",protocol:"HYP",progression:"Double",cue:"Lean away · slow eccentric"},
+    {id:"iote",name:"Incline DB Overhead Tri Ext",sets:3,reps:"10–12",protocol:"HYP",progression:"Double",cue:"Loads long head of tricep"},
+  ]},
+  Wednesday:{label:"Pull",color:"#47FFB2",exercises:[
+    {id:"bbr",name:"Barbell Bent-Over Row",sets:4,reps:"6–8",protocol:"STR",progression:"Linear",cue:"45° torso · elbows at 45° · pull to upper abs"},
+    {id:"pul",name:"Pull-Ups (overhand)",sets:3,reps:"6–10",protocol:"STR",progression:"Linear",cue:"Highest lat activation · band if needed"},
+    {id:"ulp",name:"Underhand Lat Pulldown",sets:3,reps:"10–12",protocol:"HYP",progression:"Double",cue:"Slight lean back · emphasises lower lats"},
+    {id:"csrd",name:"Chest-Supported Rear Delt Row",sets:3,reps:"12–15",protocol:"HYP",progression:"Double",cue:"Wide grip · elbows flared"},
+    {id:"fp",name:"Face Pulls",sets:3,reps:"15–20",protocol:"END",progression:"Double",cue:"Rope · high anchor · external rotation at end"},
+    {id:"bc",name:"Barbell / DB Curl",sets:3,reps:"8–12",protocol:"HYP",progression:"Double",cue:"Elbows fixed · full ROM"},
+    {id:"idc",name:"Incline Dumbbell Curl",sets:3,reps:"10–15",protocol:"HYP",progression:"Double",cue:"Loads long head under stretch"},
+  ]},
+  Friday:{label:"Legs",color:"#B47FFF",exercises:[
+    {id:"bbs",name:"Barbell Back Squat",sets:4,reps:"5–8",protocol:"STR",progression:"Linear",cue:"Full depth · thighs parallel or below"},
+    {id:"rdl",name:"Romanian Deadlift",sets:3,reps:"10–12",protocol:"HYP",progression:"Double",cue:"Hip hinge · feel the hamstring stretch"},
+    {id:"bss",name:"Bulgarian Split Squat",sets:3,reps:"8–10",protocol:"HYP",progression:"Double",cue:"Rear foot elevated · upright torso"},
+    {id:"bht",name:"Barbell Hip Thrust",sets:3,reps:"10–15",protocol:"HYP",progression:"Double",cue:"Full hip extension at top"},
+    {id:"scr",name:"Seated Calf Raise",sets:3,reps:"12–15",protocol:"HYP",progression:"Double",cue:"Pause at full stretch"},
+    {id:"cc",name:"Cable Crunch",sets:3,reps:"12–15",protocol:"HYP",progression:"Double",cue:"Kneel facing stack · loaded ab work"},
+    {id:"hlr",name:"Hanging Leg Raise",sets:3,reps:"12–15",protocol:"END",progression:"Double",cue:"Controlled · no swinging"},
+  ]}
+};
+const DAYS=["Monday","Wednesday","Friday"];
+const DAY_LABELS={Monday:"Push",Wednesday:"Pull",Friday:"Legs"};
+const DAY_COLORS={Monday:"#E8FF47",Wednesday:"#47FFB2",Friday:"#B47FFF"};
+const KEY_LIFTS=[
+  {id:"ibp",name:"Incline Bench",day:"Monday",color:"#E8FF47"},
+  {id:"bbr",name:"Bent-Over Row",day:"Wednesday",color:"#47FFB2"},
+  {id:"pul",name:"Pull-Ups",day:"Wednesday",color:"#47FFB2"},
+  {id:"bbs",name:"Back Squat",day:"Friday",color:"#B47FFF"},
+  {id:"rdl",name:"RDL",day:"Friday",color:"#B47FFF"},
+  {id:"bht",name:"Hip Thrust",day:"Friday",color:"#B47FFF"},
+];
+const ALL_EXERCISES={Monday:["ibp","fdp","dcf","sdp","llr","iote"],Wednesday:["bbr","pul","ulp","csrd","fp","bc","idc"],Friday:["bbs","rdl","bss","bht","scr","cc","hlr"]};
+const PROTO={STR:{label:"Strength",bg:"#2D1F00",text:"#FCD34D"},HYP:{label:"Hypertrophy",bg:"#0D1F3C",text:"#93C5FD"},END:{label:"Endurance",bg:"#052E16",text:"#86EFAC"}};
+const PROG={Linear:{bg:"#2D1206",text:"#FCA5A5"},Double:{bg:"#0F1F10",text:"#A7F3D0"}};
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function getWeekKey(offset=0){const now=new Date();const day=now.getDay();const monday=new Date(now);monday.setDate(now.getDate()-((day+6)%7)+offset*7);return monday.toISOString().slice(0,10);}
+function formatWeekLabel(key){const d=new Date(key+"T12:00:00");return d.toLocaleDateString("en-GB",{day:"numeric",month:"short"});}
+function getAllWeeks(wData,bData){const keys=new Set([getWeekKey()]);Object.keys(wData).forEach(k=>keys.add(k.split("__")[0]));Object.keys(bData).forEach(k=>keys.add(k));return[...keys].sort();}
+function getBestSet(wData,wk,dk,id){const e=wData[`${wk}__${dk}__${id}`];if(!e?.sets?.length)return null;const f=e.sets.filter(s=>s.kg&&s.reps);if(!f.length)return null;return f.reduce((b,s)=>parseFloat(s.kg)*parseFloat(s.reps)>parseFloat(b.kg)*parseFloat(b.reps)?s:b);}
+function getWeekVolume(wData,wk,dk){let t=0;(ALL_EXERCISES[dk]||[]).forEach(id=>{const e=wData[`${wk}__${dk}__${id}`];if(e?.sets)e.sets.forEach(s=>{if(s.kg&&s.reps)t+=parseFloat(s.kg)*parseFloat(s.reps);});});return Math.round(t);}
+function sessionLogged(wData,wk,dk){return(ALL_EXERCISES[dk]||[]).some(id=>(wData[`${wk}__${dk}__${id}`]?.sets||[]).some(s=>s.kg||s.reps));}
+function buildCSV(data,wk){const rows=[["Week","Day","Exercise","Protocol","Set","Weight (kg)","Reps"]];DAYS.forEach(d=>{PLAN[d].exercises.forEach(ex=>{const e=data[`${wk}__${d}__${ex.id}`];const sets=e?.sets||[];const proto=PROTO[ex.protocol]?.label||ex.protocol;if(!sets.length)rows.push([formatWeekLabel(wk),d,ex.name,proto,"—","—","—"]);else sets.forEach((s,i)=>rows.push([formatWeekLabel(wk),d,ex.name,proto,i+1,s.kg||"—",s.reps||"—"]));});});return rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");}
+function triggerCSV(csv,wk){const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`workout_${wk}.csv`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);}
+async function loadWD(){try{const r=await window.storage.get("wt_v3");return r?JSON.parse(r.value):{};}catch{return{};}}
+async function saveWD(data){try{await window.storage.set("wt_v3",JSON.stringify(data));}catch{}}
+async function loadBD(){try{const r=await window.storage.get("body_v1");return r?JSON.parse(r.value):{};}catch{return{};}}
+async function saveBD(data){try{await window.storage.set("body_v1",JSON.stringify(data));}catch{}}
+
+// ── SHARED COMPONENTS ─────────────────────────────────────────────────────────
+function NumInput({value,onChange,placeholder,unit,accent}){
+  return(
+    <div style={{position:"relative",flex:1}}>
+      <input inputMode="decimal" type="number" value={value} placeholder={placeholder} onChange={e=>onChange(e.target.value)}
+        style={{width:"100%",padding:"11px 30px 11px 10px",fontSize:17,fontWeight:700,background:"#262626",border:"1px solid #333",borderRadius:8,color:"#fff",outline:"none",fontFamily:"inherit",WebkitAppearance:"none",boxSizing:"border-box"}}
+        onFocus={e=>{e.target.style.borderColor=accent||"#E8FF47";e.target.style.background="#2c2c2c";}}
+        onBlur={e=>{e.target.style.borderColor="#333";e.target.style.background="#262626";}}/>
+      <span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",fontSize:10,color:"#555",fontWeight:700,pointerEvents:"none"}}>{unit}</span>
+    </div>
+  );
+}
+function TrendArrow({current,previous,unit=""}){
+  if(!current||!previous)return null;
+  const diff=parseFloat(current)-parseFloat(previous);
+  if(Math.abs(diff)<0.1)return React.createElement("span",{style:{fontSize:11,color:"#555"}},"→ no change");
+  const up=diff>0;
+  return React.createElement("span",{style:{fontSize:11,color:up?"#4ade80":"#f87171",fontWeight:600}},`${up?"▲":"▼"} ${Math.abs(diff).toFixed(1)}${unit}`);
+}
+function SparkLine({values,color,width=300,height=44}){
+  const valid=values.map((v,i)=>({v:parseFloat(v)||0,i})).filter(p=>p.v>0);
+  if(valid.length<2)return React.createElement("div",{style:{height,display:"flex",alignItems:"center",fontSize:11,color:"#333"}},"— log more weeks to see trend");
+  const min=Math.min(...valid.map(p=>p.v));
+  const max=Math.max(...valid.map(p=>p.v));
+  const range=max-min||1;
+  const total=values.length;
+  const pts=valid.map(p=>`${(p.i/(total-1))*width},${height-((p.v-min)/range)*(height-8)-4}`).join(" ");
+  return React.createElement("svg",{width,height,style:{overflow:"visible",display:"block"}},
+    React.createElement("polyline",{points:pts,fill:"none",stroke:color,strokeWidth:"2.5",strokeLinejoin:"round",strokeLinecap:"round"}),
+    valid.map((p,i)=>React.createElement("circle",{key:i,cx:(p.i/(total-1))*width,cy:height-((p.v-min)/range)*(height-8)-4,r:"3.5",fill:color}))
+  );
+}
+
+// ── SET ROW ───────────────────────────────────────────────────────────────────
+function SetRow({setNum,weight,reps,prevWeight,prevReps,onWChange,onRChange,accent}){
+  const improved=weight&&prevWeight&&parseFloat(weight)>parseFloat(prevWeight);
+  const complete=weight&&reps;
+  return(
+    <div style={{marginBottom:10}}>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,background:complete?accent:"#262626",border:"1px solid "+(complete?accent:"#333"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:complete?"#1a1a1a":"#444",transition:"all 0.2s"}}>
+          {complete?"✓":setNum}
+        </div>
+        <NumInput value={weight} onChange={onWChange} placeholder="0" unit="KG" accent={accent}/>
+        <div style={{color:"#333",fontSize:16,flexShrink:0}}>×</div>
+        <NumInput value={reps} onChange={onRChange} placeholder="0" unit="REPS" accent={accent}/>
+        {improved&&<span style={{fontSize:16,flexShrink:0}}>🔥</span>}
+      </div>
+      {(prevWeight||prevReps)&&setNum===1&&(
+        <div style={{fontSize:11,color:"#444",marginTop:4,marginLeft:34,fontStyle:"italic"}}>
+          Last week: <span style={{color:"#666"}}>{prevWeight?`${prevWeight}kg`:"—"} × {prevReps?`${prevReps} reps`:"—"}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── EXERCISE CARD ─────────────────────────────────────────────────────────────
+function ExerciseCard({ex,weekKey,dayKey,wData,onUpdate,accent}){
+  const[expanded,setExpanded]=useState(false);
+  const key=`${weekKey}__${dayKey}__${ex.id}`;
+  const entry=wData[key]||{sets:[]};
+  const prevDate=new Date(weekKey+"T12:00:00");
+  prevDate.setDate(prevDate.getDate()-7);
+  const prev=wData[`${prevDate.toISOString().slice(0,10)}__${dayKey}__${ex.id}`]||{sets:[]};
+  const getSet=i=>entry.sets[i]||{kg:"",reps:""};
+  const getPrev=i=>prev.sets[i]||{kg:"",reps:""};
+  const updateSet=(i,field,val)=>{const sets=[...(entry.sets||[])];while(sets.length<=i)sets.push({kg:"",reps:""});sets[i]={...sets[i],[field]:val};onUpdate(key,{...entry,sets});};
+  const proto=PROTO[ex.protocol]||{};
+  const prog=PROG[ex.progression]||{};
+  const filled=(entry.sets||[]).filter(s=>s.kg||s.reps).length;
+  const done=filled>=ex.sets;
+  return(
+    <div style={{background:"#1e1e1e",borderRadius:12,marginBottom:10,border:"1px solid "+(done?accent+"55":"#2a2a2a"),overflow:"hidden",transition:"border-color 0.3s"}}>
+      <div onClick={()=>setExpanded(!expanded)} style={{padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:38,height:38,borderRadius:9,flexShrink:0,background:done?accent+"22":"#262626",display:"flex",alignItems:"center",justifyContent:"center",fontSize:done?16:12,fontWeight:800,color:done?accent:"#444",border:"1px solid "+(done?accent:"#333"),transition:"all 0.3s"}}>
+          {done?"✓":`${filled}/${ex.sets}`}
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:700,color:done?accent:"#e5e5e5",marginBottom:4,lineHeight:1.3,transition:"color 0.3s"}}>{ex.name}</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+            <span style={{fontSize:11,color:"#555",fontWeight:600}}>{ex.sets} × {ex.reps}</span>
+            <span style={{fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:999,background:proto.bg,color:proto.text}}>{proto.label}</span>
+            <span style={{fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:999,background:prog.bg,color:prog.text}}>{ex.progression}</span>
+          </div>
+        </div>
+        <div style={{fontSize:12,color:"#333",flexShrink:0,transform:expanded?"rotate(180deg)":"none",transition:"transform 0.2s"}}>▼</div>
+      </div>
+      {expanded&&(
+        <div style={{padding:"0 14px 14px",borderTop:"1px solid #252525"}}>
+          <div style={{fontSize:11,color:"#555",fontStyle:"italic",padding:"8px 0 12px",lineHeight:1.5}}>💡 {ex.cue}</div>
+          {Array.from({length:ex.sets}).map((_,i)=>(
+            <SetRow key={i} setNum={i+1} weight={getSet(i).kg} reps={getSet(i).reps} prevWeight={getPrev(i).kg} prevReps={getPrev(i).reps} onWChange={val=>updateSet(i,"kg",val)} onRChange={val=>updateSet(i,"reps",val)} accent={accent}/>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── BODY MODAL ────────────────────────────────────────────────────────────────
+function BodyModal({weekKey,bData,onSave,onClose}){
+  const ex=bData[weekKey]||{};
+  const[weight,setWeight]=useState(ex.weight||"");
+  const[waist,setWaist]=useState(ex.waist||"");
+  const[bf,setBf]=useState(ex.bodyFat||"");
+  const[chest,setChest]=useState(ex.chest||"");
+  const[glutes,setGlutes]=useState(ex.glutes||"");
+  const field=(label,val,setter,unit)=>(
+    <div style={{marginBottom:12}}>
+      <div style={{fontSize:11,fontWeight:700,color:"#666",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>{label}</div>
+      <div style={{position:"relative"}}>
+        <input inputMode="decimal" type="number" value={val} placeholder="—" onChange={e=>setter(e.target.value)}
+          style={{width:"100%",padding:"12px 40px 12px 12px",fontSize:18,fontWeight:700,background:"#262626",border:"1px solid #333",borderRadius:10,color:"#fff",outline:"none",fontFamily:"inherit",boxSizing:"border-box",WebkitAppearance:"none"}}
+          onFocus={e=>e.target.style.borderColor="#E8FF47"} onBlur={e=>e.target.style.borderColor="#333"}/>
+        <span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",fontSize:12,color:"#555",fontWeight:600}}>{unit}</span>
+      </div>
+    </div>
+  );
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:400,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{background:"#1a1a1a",borderRadius:"20px 20px 0 0",padding:"20px 16px 44px",width:"100%",maxWidth:480,border:"1px solid #2a2a2a"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div>
+            <div style={{fontSize:18,fontWeight:800}}>Weekly Check-In</div>
+            <div style={{fontSize:12,color:"#555"}}>w/c {formatWeekLabel(weekKey)}</div>
+          </div>
+          <button onClick={onClose} style={{background:"#262626",border:"none",color:"#888",fontSize:18,width:36,height:36,borderRadius:"50%",cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+        </div>
+        {field("Weight",weight,setWeight,"kg")}
+        {field("Waist",waist,setWaist,"cm")}
+        {field("Body Fat",bf,setBf,"%")}
+        {field("Chest (tape)",chest,setChest,"cm")}
+        {field("Glutes (tape)",glutes,setGlutes,"cm")}
+        <button onClick={()=>{onSave(weekKey,{weight,waist,bodyFat:bf,chest,glutes,date:new Date().toISOString()});onClose();}}
+          style={{width:"100%",padding:16,borderRadius:14,background:"#E8FF47",color:"#111",fontWeight:800,fontSize:15,border:"none",cursor:"pointer",fontFamily:"inherit",marginTop:8}}>
+          Save check-in
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── TRACKER SCREEN ────────────────────────────────────────────────────────────
+function TrackerScreen({wData,setWData}){
+  const[activeDay,setActiveDay]=useState("Monday");
+  const[weekKey,setWeekKey]=useState(getWeekKey());
+  const[saveState,setSaveState]=useState("idle");
+  const[toast,setToast]=useState(false);
+  const allWeeks=[...new Set([getWeekKey(),...Object.keys(wData).map(k=>k.split("__")[0])])].sort().reverse();
+  const day=PLAN[activeDay];
+  const totalEx=DAYS.reduce((a,d)=>a+PLAN[d].exercises.length,0);
+  const filledEx=DAYS.reduce((a,d)=>a+PLAN[d].exercises.filter(ex=>(wData[`${weekKey}__${d}__${ex.id}`]?.sets||[]).filter(s=>s.kg||s.reps).length>0).length,0);
+  const dayDone=day.exercises.filter(ex=>(wData[`${weekKey}__${activeDay}__${ex.id}`]?.sets||[]).filter(s=>s.kg||s.reps).length>=ex.sets).length;
+  const handleUpdate=(key,val)=>{setWData(prev=>({...prev,[key]:val}));setSaveState("idle");};
+  const handleSave=async()=>{setSaveState("saving");await saveWD(wData);triggerCSV(buildCSV(wData,weekKey),weekKey);setSaveState("saved");setToast(true);setTimeout(()=>{setSaveState("idle");setToast(false);},3000);};
+  return(
+    <div style={{paddingBottom:110}}>
+      <div style={{padding:"20px 16px 0"}}>
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:"0.12em",color:"#444",textTransform:"uppercase",marginBottom:2}}>Anthony · 90-Day Plan</div>
+        <div style={{fontSize:26,fontWeight:800,letterSpacing:"-0.5px",marginBottom:14}}>Workout Tracker</div>
+        <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,WebkitOverflowScrolling:"touch"}}>
+          {allWeeks.map(w=>(
+            <button key={w} onClick={()=>setWeekKey(w)} style={{padding:"6px 12px",borderRadius:20,border:"1px solid",borderColor:w===weekKey?"#E8FF47":"#2a2a2a",background:w===weekKey?"#E8FF4722":"transparent",color:w===weekKey?"#E8FF47":"#555",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"inherit",flexShrink:0}}>
+              {w===getWeekKey()?"This week":`w/c ${formatWeekLabel(w)}`}
+            </button>
+          ))}
+        </div>
+        <div style={{background:"#1a1a1a",borderRadius:12,padding:"12px 14px",marginBottom:14,border:"1px solid #2a2a2a"}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+            <span style={{fontSize:12,color:"#555"}}>Week progress</span>
+            <span style={{fontSize:12,fontWeight:700,color:"#E8FF47"}}>{filledEx} / {totalEx}</span>
+          </div>
+          <div style={{background:"#262626",borderRadius:999,height:5,overflow:"hidden"}}>
+            <div style={{height:"100%",borderRadius:999,background:"linear-gradient(90deg,#E8FF47,#B47FFF)",width:`${totalEx>0?(filledEx/totalEx)*100:0}%`,transition:"width 0.4s"}}/>
+          </div>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,padding:"0 16px 14px"}}>
+        {DAYS.map(d=>{
+          const info=PLAN[d];
+          const done=info.exercises.filter(ex=>(wData[`${weekKey}__${d}__${ex.id}`]?.sets||[]).filter(s=>s.kg||s.reps).length>=ex.sets).length;
+          const active=activeDay===d;
+          return(
+            <button key={d} onClick={()=>setActiveDay(d)} style={{borderRadius:12,padding:"12px 8px",border:"1px solid "+(active?info.color:"#2a2a2a"),background:active?info.color+"18":"#1a1a1a",cursor:"pointer",fontFamily:"inherit",textAlign:"left",transition:"all 0.15s"}}>
+              <div style={{fontSize:10,color:active?info.color:"#444",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>{d.slice(0,3)}</div>
+              <div style={{fontSize:14,fontWeight:800,color:active?info.color:"#666",marginBottom:6}}>{info.label}</div>
+              <div style={{background:"#262626",borderRadius:999,height:3,overflow:"hidden",marginBottom:3}}>
+                <div style={{height:"100%",background:info.color,width:`${(done/info.exercises.length)*100}%`,borderRadius:999,transition:"width 0.3s"}}/>
+              </div>
+              <div style={{fontSize:10,color:"#444"}}>{done}/{info.exercises.length}</div>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{padding:"0 16px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+          <div style={{width:8,height:8,borderRadius:"50%",background:day.color,boxShadow:`0 0 10px ${day.color}88`}}/>
+          <div style={{fontSize:16,fontWeight:800}}>{activeDay} — {day.label}</div>
+          <div style={{fontSize:12,color:"#444",marginLeft:"auto"}}>{dayDone}/{day.exercises.length} done</div>
+        </div>
+        {day.exercises.map(ex=>(
+          <ExerciseCard key={ex.id} ex={ex} weekKey={weekKey} dayKey={activeDay} wData={wData} onUpdate={handleUpdate} accent={day.color}/>
+        ))}
+        <div style={{background:"#1a1200",border:"1px solid #3D3000",borderRadius:12,padding:"12px 14px",display:"flex",gap:10,alignItems:"center",marginTop:4}}>
+          <span style={{fontSize:20}}>🚶</span>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#FCD34D"}}>Zone 2 — 25 min</div>
+            <div style={{fontSize:11,color:"#78490A"}}>12–15% incline · 3.0 mph · 120–135 bpm</div>
+          </div>
+        </div>
+      </div>
+      {toast&&(
+        <div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:"#1a1a1a",border:"1px solid #E8FF47",borderRadius:12,padding:"10px 16px",zIndex:300,display:"flex",alignItems:"center",gap:8,boxShadow:"0 4px 24px rgba(0,0,0,0.6)"}}>
+          <span style={{fontSize:16}}>📥</span>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#E8FF47"}}>Session saved</div>
+            <div style={{fontSize:11,color:"#666"}}>CSV downloaded — save to iCloud Drive</div>
+          </div>
+        </div>
+      )}
+      <div style={{position:"fixed",bottom:64,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,padding:"12px 16px",background:"linear-gradient(to top,#111 70%,transparent)",zIndex:100}}>
+        <button onClick={handleSave} style={{width:"100%",padding:16,borderRadius:14,background:saveState==="saved"?"#22c55e":saveState==="saving"?"#555":"#E8FF47",color:saveState==="saved"?"#fff":"#111",fontWeight:800,fontSize:15,border:"none",cursor:"pointer",fontFamily:"inherit",transition:"all 0.25s"}}>
+          {saveState==="saving"?"Saving...":saveState==="saved"?"✓ Saved + CSV downloaded":"Save session"}
+        </button>
+        <div style={{textAlign:"center",fontSize:10,color:"#333",marginTop:5}}>Saves to browser · auto-downloads CSV backup</div>
+      </div>
+    </div>
+  );
+}
+
+// ── DASHBOARD SCREEN ──────────────────────────────────────────────────────────
+function DashboardScreen({wData,bData,setBData}){
+  const[tab,setTab]=useState("overview");
+  const[showModal,setShowModal]=useState(false);
+  const handleSaveBody=async(wk,metrics)=>{const updated={...bData,[wk]:metrics};setBData(updated);await saveBD(updated);};
+  const thisWeek=getWeekKey();
+  const lastWeek=getWeekKey(-1);
+  const weeks=getAllWeeks(wData,bData);
+  const thisBody=bData[thisWeek]||{};
+  const lastBody=bData[lastWeek]||{};
+  const thisWeekHits=DAYS.filter(d=>sessionLogged(wData,thisWeek,d)).length;
+  const streak=(()=>{let s=0;for(let i=weeks.length-1;i>=0;i--){if(DAYS.filter(d=>sessionLogged(wData,weeks[i],d)).length===3)s++;else break;}return s;})();
+  const totalSessions=weeks.reduce((a,w)=>a+DAYS.filter(d=>sessionLogged(wData,w,d)).length,0);
+  const volByWeek=weeks.map(w=>({week:w,total:DAYS.reduce((a,d)=>a+getWeekVolume(wData,w,d),0),push:getWeekVolume(wData,w,"Monday"),pull:getWeekVolume(wData,w,"Wednesday"),legs:getWeekVolume(wData,w,"Friday")}));
+  const maxVol=Math.max(...volByWeek.map(v=>v.total),1);
+  const strengthData=KEY_LIFTS.map(lift=>({...lift,points:weeks.map(w=>{const b=getBestSet(wData,w,lift.day,lift.id);return b?parseFloat(b.kg):null;}),thisKg:getBestSet(wData,thisWeek,lift.day,lift.id)?.kg,lastKg:getBestSet(wData,lastWeek,lift.day,lift.id)?.kg}));
+
+  const StatCard=({label,value,sub,color,big})=>(
+    <div style={{background:"#1e1e1e",borderRadius:12,padding:"12px 14px",border:"1px solid #2a2a2a",flex:1,minWidth:0}}>
+      <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#555",marginBottom:4}}>{label}</div>
+      <div style={{fontSize:big?26:20,fontWeight:800,color:color||"#fff",letterSpacing:"-0.5px"}}>{value}</div>
+      {sub&&<div style={{fontSize:11,color:"#444",marginTop:2}}>{sub}</div>}
+    </div>
+  );
+
+  return(
+    <div style={{paddingBottom:80}}>
+      <div style={{padding:"20px 16px 0"}}>
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:"0.12em",color:"#444",textTransform:"uppercase",marginBottom:2}}>Anthony · 90-Day Plan</div>
+        <div style={{fontSize:26,fontWeight:800,letterSpacing:"-0.5px",marginBottom:14}}>Progress Dashboard</div>
+        <div style={{display:"flex",gap:6,marginBottom:18,overflowX:"auto",WebkitOverflowScrolling:"touch",paddingBottom:2}}>
+          {["overview","strength","volume","body"].map(t=>(
+            <button key={t} onClick={()=>setTab(t)} style={{padding:"7px 14px",borderRadius:20,border:"1px solid",borderColor:tab===t?"#E8FF47":"#2a2a2a",background:tab===t?"#E8FF4722":"transparent",color:tab===t?"#E8FF47":"#555",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",flexShrink:0,textTransform:"capitalize"}}>{t}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{padding:"0 16px"}}>
+
+        {tab==="overview"&&(<>
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            <StatCard label="This week" value={`${thisWeekHits}/3`} sub="sessions" color={thisWeekHits===3?"#4ade80":thisWeekHits>=2?"#E8FF47":"#f87171"} big/>
+            <StatCard label="Streak" value={streak} sub="full weeks" color="#E8FF47" big/>
+            <StatCard label="All time" value={totalSessions} sub="sessions" color="#888"/>
+          </div>
+          <div style={{background:"#1e1e1e",borderRadius:12,padding:"14px",marginBottom:12,border:"1px solid #2a2a2a"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#555",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>Consistency — last 12 weeks</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {weeks.slice(-12).map(w=>{
+                const isThis=w===thisWeek;
+                return(<div key={w} style={{textAlign:"center"}}>
+                  <div style={{display:"flex",gap:3,marginBottom:3}}>
+                    {DAYS.map(d=>(<div key={d} style={{width:9,height:9,borderRadius:2,background:sessionLogged(wData,w,d)?DAY_COLORS[d]:"#222",border:isThis?"1px solid #555":"none"}}/>))}
+                  </div>
+                  <div style={{fontSize:9,color:"#333"}}>{formatWeekLabel(w).split(" ")[0]}</div>
+                </div>);
+              })}
+            </div>
+            <div style={{display:"flex",gap:12,marginTop:10}}>
+              {DAYS.map(d=>(<div key={d} style={{display:"flex",alignItems:"center",gap:5,fontSize:10,color:"#555"}}>
+                <div style={{width:8,height:8,borderRadius:2,background:DAY_COLORS[d]}}/>{DAY_LABELS[d]}
+              </div>))}
+            </div>
+          </div>
+          <div style={{background:"#1e1e1e",borderRadius:12,padding:"14px",marginBottom:12,border:"1px solid #2a2a2a"}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#555",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>This week's volume</div>
+            {DAYS.map(d=>{
+              const vol=getWeekVolume(wData,thisWeek,d);
+              const logged=sessionLogged(wData,thisWeek,d);
+              return(<div key={d} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                <div style={{width:8,height:8,borderRadius:2,background:DAY_COLORS[d],flexShrink:0}}/>
+                <div style={{fontSize:13,fontWeight:600,width:84,color:logged?"#fff":"#444"}}>{d.slice(0,3)} · {DAY_LABELS[d]}</div>
+                <div style={{flex:1,background:"#262626",borderRadius:999,height:6,overflow:"hidden"}}>
+                  <div style={{height:"100%",background:DAY_COLORS[d],borderRadius:999,width:logged?"100%":"0%",opacity:logged?1:0.15,transition:"width 0.4s"}}/>
+                </div>
+                <div style={{fontSize:12,fontWeight:700,color:logged?DAY_COLORS[d]:"#333",width:52,textAlign:"right"}}>{vol>0?`${(vol/1000).toFixed(1)}t`:"—"}</div>
+              </div>);
+            })}
+          </div>
+          <div style={{background:"#1e1e1e",borderRadius:12,padding:"14px",border:"1px solid #2a2a2a"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#555",textTransform:"uppercase",letterSpacing:"0.08em"}}>Body · this week</div>
+              <button onClick={()=>setShowModal(true)} style={{padding:"5px 12px",borderRadius:20,border:"1px solid #E8FF47",background:"transparent",color:"#E8FF47",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>+ Log</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+              {[{label:"Weight",val:thisBody.weight,prev:lastBody.weight,unit:"kg"},{label:"Waist",val:thisBody.waist,prev:lastBody.waist,unit:"cm"},{label:"Body fat",val:thisBody.bodyFat,prev:lastBody.bodyFat,unit:"%"}].map(m=>(
+                <div key={m.label} style={{background:"#262626",borderRadius:10,padding:"10px"}}>
+                  <div style={{fontSize:10,color:"#555",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>{m.label}</div>
+                  <div style={{fontSize:17,fontWeight:800,color:m.val?"#fff":"#333"}}>{m.val?`${m.val}${m.unit}`:"—"}</div>
+                  <TrendArrow current={m.val} previous={m.prev} unit={m.unit}/>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>)}
+
+        {tab==="strength"&&(<>
+          <div style={{fontSize:12,color:"#555",marginBottom:14,lineHeight:1.6}}>Best set weight per key lift each week.</div>
+          {strengthData.map(lift=>(
+            <div key={lift.id} style={{background:"#1e1e1e",borderRadius:12,padding:"14px",marginBottom:10,border:"1px solid #2a2a2a"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:700,marginBottom:2}}>{lift.name}</div>
+                  <div style={{fontSize:11,color:"#555"}}>{lift.day}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:22,fontWeight:800,color:lift.color}}>{lift.thisKg?`${lift.thisKg}kg`:"—"}</div>
+                  <TrendArrow current={lift.thisKg} previous={lift.lastKg} unit="kg"/>
+                </div>
+              </div>
+              <SparkLine values={lift.points} color={lift.color}/>
+            </div>
+          ))}
+        </>)}
+
+        {tab==="volume"&&(<>
+          <div style={{fontSize:12,color:"#555",marginBottom:14}}>Total tonnage (kg × reps × sets) per week.</div>
+          {volByWeek.slice(-8).reverse().map(v=>{
+            const isThis=v.week===thisWeek;
+            return(<div key={v.week} style={{background:"#1e1e1e",borderRadius:12,padding:"14px",marginBottom:10,border:"1px solid "+(isThis?"#E8FF4744":"#2a2a2a")}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+                <div style={{fontSize:13,fontWeight:700,color:isThis?"#E8FF47":"#888"}}>{isThis?"This week":`w/c ${formatWeekLabel(v.week)}`}</div>
+                <div style={{fontSize:14,fontWeight:800}}>{v.total>0?`${(v.total/1000).toFixed(1)}t`:"—"}</div>
+              </div>
+              {[{label:"Push",val:v.push,color:"#E8FF47"},{label:"Pull",val:v.pull,color:"#47FFB2"},{label:"Legs",val:v.legs,color:"#B47FFF"}].map(bar=>(
+                <div key={bar.label} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                  <div style={{fontSize:11,color:"#555",width:36,flexShrink:0}}>{bar.label}</div>
+                  <div style={{flex:1,background:"#262626",borderRadius:999,height:6,overflow:"hidden"}}>
+                    <div style={{height:"100%",background:bar.color,borderRadius:999,width:`${(bar.val/maxVol)*100}%`,transition:"width 0.4s"}}/>
+                  </div>
+                  <div style={{fontSize:11,fontWeight:700,color:bar.val>0?bar.color:"#333",width:44,textAlign:"right"}}>{bar.val>0?`${(bar.val/1000).toFixed(1)}t`:"—"}</div>
+                </div>
+              ))}
+            </div>);
+          })}
+        </>)}
+
+        {tab==="body"&&(<>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <div style={{fontSize:12,color:"#555"}}>Monday morning check-ins</div>
+            <button onClick={()=>setShowModal(true)} style={{padding:"7px 14px",borderRadius:20,border:"1px solid #E8FF47",background:"#E8FF4722",color:"#E8FF47",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>+ Log</button>
+          </div>
+          {[{label:"Weight",key:"weight",unit:"kg",color:"#E8FF47"},{label:"Waist",key:"waist",unit:"cm",color:"#47FFB2"},{label:"Body Fat %",key:"bodyFat",unit:"%",color:"#B47FFF"},{label:"Chest",key:"chest",unit:"cm",color:"#ff9f47"},{label:"Glutes",key:"glutes",unit:"cm",color:"#ff6b6b"}].map(m=>{
+            const vals=weeks.map(w=>bData[w]?.[m.key]||null);
+            const current=thisBody[m.key];
+            const previous=lastBody[m.key];
+            const startVal=bData[weeks[0]]?.[m.key];
+            const totalChange=current&&startVal?(parseFloat(current)-parseFloat(startVal)).toFixed(1):null;
+            return(<div key={m.key} style={{background:"#1e1e1e",borderRadius:12,padding:"14px",marginBottom:10,border:"1px solid #2a2a2a"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:700,marginBottom:3}}>{m.label}</div>
+                  <TrendArrow current={current} previous={previous} unit={m.unit}/>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:24,fontWeight:800,color:current?m.color:"#333"}}>{current?`${current}${m.unit}`:"—"}</div>
+                  {totalChange&&<div style={{fontSize:11,color:"#555"}}>total: {totalChange>0?"+":""}{totalChange}{m.unit}</div>}
+                </div>
+              </div>
+              <SparkLine values={vals} color={m.color}/>
+            </div>);
+          })}
+          {weeks.some(w=>bData[w])&&(
+            <div style={{background:"#1e1e1e",borderRadius:12,padding:"14px",border:"1px solid #2a2a2a",marginTop:4}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#555",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>All check-ins</div>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                  <thead><tr>{["Week","Wt","Waist","BF%","Chest","Glutes"].map(h=>(<th key={h} style={{textAlign:"left",padding:"4px 8px",color:"#444",fontWeight:600,fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em",borderBottom:"1px solid #2a2a2a"}}>{h}</th>))}</tr></thead>
+                  <tbody>{weeks.filter(w=>bData[w]).reverse().map(w=>{
+                    const m=bData[w];
+                    return(<tr key={w}>
+                      <td style={{padding:"8px 8px",color:w===thisWeek?"#E8FF47":"#888",fontWeight:w===thisWeek?700:400,borderBottom:"1px solid #1a1a1a"}}>{formatWeekLabel(w)}</td>
+                      {["weight","waist","bodyFat","chest","glutes"].map(k=>(<td key={k} style={{padding:"8px 8px",color:"#ccc",borderBottom:"1px solid #1a1a1a"}}>{m[k]||"—"}</td>))}
+                    </tr>);
+                  })}</tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>)}
+      </div>
+      {showModal&&<BodyModal weekKey={thisWeek} bData={bData} onSave={handleSaveBody} onClose={()=>setShowModal(false)}/>}
+    </div>
+  );
+}
+
+// ── ROOT ──────────────────────────────────────────────────────────────────────
+function App(){
+  const[screen,setScreen]=useState("tracker");
+  const[wData,setWData]=useState(null);
+  const[bData,setBData]=useState(null);
+  useEffect(()=>{Promise.all([loadWD(),loadBD()]).then(([w,b])=>{setWData(w);setBData(b);});}, []);
+  if(!wData||!bData)return React.createElement("div",{style:{background:"#111",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontFamily:"sans-serif",fontSize:14}},"Loading...");
+  const thisWeek=getWeekKey();
+  const hits=DAYS.filter(d=>sessionLogged(wData,thisWeek,d)).length;
+  return React.createElement("div",{style:{background:"#111",minHeight:"100vh",fontFamily:"'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif"}},
+    screen==="tracker"&&React.createElement(TrackerScreen,{wData,setWData}),
+    screen==="dashboard"&&React.createElement(DashboardScreen,{wData,bData,setBData}),
+    React.createElement("div",{style:{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"#161616",borderTop:"1px solid #2a2a2a",zIndex:200,display:"grid",gridTemplateColumns:"1fr 1fr"}},
+      [
+        {id:"tracker",label:"Tracker",icon:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>`},
+        {id:"dashboard",label:"Progress",icon:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`},
+      ].map(item=>{
+        const active=screen===item.id;
+        return React.createElement("button",{key:item.id,onClick:()=>setScreen(item.id),style:{padding:"10px 0 14px",border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,fontFamily:"inherit",color:active?"#E8FF47":"#555"}},
+          React.createElement("span",{dangerouslySetInnerHTML:{__html:item.icon}}),
+          React.createElement("span",{style:{fontSize:10,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase"}},
+            item.label,
+            item.id==="tracker"&&hits>0&&React.createElement("span",{style:{marginLeft:4,background:"#E8FF47",color:"#111",borderRadius:999,fontSize:9,fontWeight:800,padding:"1px 5px"}},`${hits}/3`)
+          )
+        );
+      })
+    )
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>
